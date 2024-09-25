@@ -1,18 +1,8 @@
+// Dart code for Flutter framework
+
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
-
-void main() {
-  runApp(MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: LoginActivity(),
-    );
-  }
-}
 
 class LoginActivity extends StatefulWidget {
   @override
@@ -27,61 +17,52 @@ class _LoginActivityState extends State<LoginActivity> {
   @override
   void initState() {
     super.initState();
-    // Simulating the retrieval of preferences
-    final preferences = {}; // Replace with actual preferences retrieval
-    isLogout = preferences['token'] != null;
+    _loadPreferences();
+  }
+
+  Future<void> _loadPreferences() async {
+    SharedPreferences preferences = await SharedPreferences.getInstance();
+    isLogout = preferences.getString("token") != null;
     if (isLogout) {
-      usernameController.text = preferences['username'] ?? 'N/A';
+      setState(() {
+        usernameController.text = preferences.getString("username") ?? "N/A";
+      });
     }
   }
 
-  void login() async {
-    final salt = Random().nextInt(10000);
-    final username = usernameController.text;
-    final password = passwordController.text;
+  void _login() async {
+    int salt = Random().nextInt(10000);
+    String username = usernameController.text;
+    String password = passwordController.text;
 
     if (username.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Username cannot be null')),
-      );
+      _showToast('Username cannot be empty');
       return;
     }
-
     if (password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Password cannot be null')),
-      );
+      _showToast('Password cannot be empty');
       return;
     }
 
     if (isLogout) {
-      // Simulating logout
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Restart to apply changes')),
-      );
+      await MainActivity.member?.logout();
+      await MainActivity.mainWeakReference?.get()?.refreshUserInfo();
+      _showToast('Restart to apply changes');
       Navigator.of(context).pop();
       return;
     }
 
-    // Simulating login process
-    final loginResponse = await loginUser(username, password, salt);
-    if (loginResponse.code == 200) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login successful')),
-      );
+    var loginResponse = await MainActivity.member?.login(username, password, salt);
+    if (loginResponse?.code == 200) {
+      await MainActivity.mainWeakReference?.get()?.refreshUserInfo();
       Navigator.of(context).pop();
       return;
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(loginResponse.message)),
-    );
+    _showToast(loginResponse?.message ?? 'Login failed');
   }
 
-  Future<LoginResponse> loginUser(String username, String password, int salt) async {
-    // Simulate login API call
-    // Replace with actual login logic
-    return LoginResponse(200, 'Success');
+  void _showToast(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -91,21 +72,18 @@ class _LoginActivityState extends State<LoginActivity> {
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             TextField(
               controller: usernameController,
               decoration: InputDecoration(labelText: 'Username'),
             ),
-            SizedBox(height: 16.0),
             TextField(
               controller: passwordController,
               decoration: InputDecoration(labelText: 'Password'),
               obscureText: true,
             ),
-            SizedBox(height: 16.0),
             ElevatedButton(
-              onPressed: login,
+              onPressed: _login,
               child: Text(isLogout ? 'Logout' : 'Login'),
             ),
           ],
@@ -113,11 +91,4 @@ class _LoginActivityState extends State<LoginActivity> {
       ),
     );
   }
-}
-
-class LoginResponse {
-  final int code;
-  final String message;
-
-  LoginResponse(this.code, this.message);
 }
